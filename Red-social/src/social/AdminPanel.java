@@ -6,6 +6,7 @@ import javax.swing.border.*;
 import javax.swing.plaf.basic.BasicButtonUI;
 import java.util.List;
 import social.AdminService.UsuarioInfo;
+import informe.ReportePDF;
 
 public class AdminPanel extends JDialog {
 
@@ -23,6 +24,7 @@ public class AdminPanel extends JDialog {
     private JButton btnEstado;
     private JButton btnGuardarRol;
     private JPanel  panelDetalle;
+    private JButton btnReporte;
 
     private static final Color BG_DARK = new Color(0x2A, 0x2A, 0x2A);
     private static final Color BG_PANEL = new Color(0x3A, 0x3A, 0x3A);
@@ -36,13 +38,14 @@ public class AdminPanel extends JDialog {
         super(owner, "Panel de Administración", true);
         this.usuarioAdminActual = usuarioAdminActual;
 
-        setSize(650, 450);
+        setSize(650, 520);
         setLocationRelativeTo(owner);
         setResizable(false);
         setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
 
         getContentPane().setLayout(new BorderLayout());
         getContentPane().setBackground(BG_DARK);
+        
 
         // Header 
         JPanel panelHeader = new JPanel(new BorderLayout());
@@ -102,6 +105,21 @@ public class AdminPanel extends JDialog {
         panelDetalle.setBackground(BG_PANEL);
         panelDetalle.setBorder(new EmptyBorder(20, 20, 20, 20));
         splitPane.setRightComponent(panelDetalle);
+        
+        getContentPane().add(splitPane, BorderLayout.CENTER);
+        
+     // Panel inferior, independiente del resto (reportes / acciones globales)
+        JPanel panelFooter = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 12));
+        panelFooter.setBackground(BG_DARK);
+        panelFooter.setBorder(new MatteBorder(1, 0, 0, 0, SEPARATOR));
+
+        btnReporte = new JButton("Generar Reporte PDF");
+        styleBoton(btnReporte, PURPLE);
+        btnReporte.setPreferredSize(new Dimension(200, 36));
+        btnReporte.addActionListener(e -> onGenerarReporte());
+        panelFooter.add(btnReporte);
+
+        getContentPane().add(panelFooter, BorderLayout.SOUTH);
 
         construirPanelDetalle();
         mostrarDetallePorDefecto();
@@ -391,6 +409,43 @@ public class AdminPanel extends JDialog {
             JOptionPane.showMessageDialog(this, "Error al cambiar estado.", "Error",
                     JOptionPane.ERROR_MESSAGE);
         }
+    }
+    
+    private void onGenerarReporte() {
+        btnReporte.setEnabled(false);
+        btnReporte.setText("Generando...");
+
+        new SwingWorker<Void, Void>() {
+            private String errorMensaje = null;
+            private String rutaGenerada = null;
+
+            @Override
+            protected Void doInBackground() {
+                try {
+                    rutaGenerada = ReportePDF.generarReporte();
+                } catch (Exception ex) {
+                    errorMensaje = ex.getMessage();
+                    ex.printStackTrace();
+                }
+                return null;
+            }
+
+            @Override
+            protected void done() {
+                btnReporte.setEnabled(true);
+                btnReporte.setText("Generar Reporte PDF");
+
+                if (errorMensaje != null) {
+                    JOptionPane.showMessageDialog(AdminPanel.this,
+                            "Error al generar el reporte:\n" + errorMensaje,
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                } else {
+                    JOptionPane.showMessageDialog(AdminPanel.this,
+                            "Reporte generado en:\n" + rutaGenerada,
+                            "Éxito", JOptionPane.INFORMATION_MESSAGE);
+                }
+            }
+        }.execute();
     }
 
     private void recargarLista() {

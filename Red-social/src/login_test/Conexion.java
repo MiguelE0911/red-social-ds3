@@ -1,34 +1,108 @@
 package login_test;
 
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
+
 import java.sql.Connection;
-import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Statement;
 
+
 public class Conexion {
+	
+	// SERVIDOR VPN
+	private static final String CONDUCTOR = "com.mysql.jdbc.Driver"; 
+	private static final String DIR = System.getenv("ADDRESS");
+	private static final String USUARIO = System.getenv("USER");
+    private static final String CONTRA = System.getenv("PASSWORD");
 
-    private static final String CONDUCTOR = "com.mysql.jdbc.Driver"; 
-    private static final String DIR = "jdbc:mysql://localhost:3307/redsocial_db";
-    private static final String USUARIO = "root";
-    private static final String CONTRA = "";
+    // SERVIDOR EN LA NUBE
+    private static final String DIR2 = System.getenv("ADDRESS2");
+    private static final String USUARIO2 = System.getenv("USER2");
+    private static final String CONTRA2 = System.getenv("PASSWORD2");
+    
+    
+    private static final int TIMEOUT_CONEXION_MS = 15_000; // 15s para intentar conectar
+    private static final int SLICE_MS = 3000; // cada intento individual
+    private static HikariDataSource poolLocal;
+    private static HikariDataSource poolNube;
+    private static final AtomicReference<HikariDataSource> poolActivo = new AtomicReference<>();
+    private static final AtomicBoolean forzarNube = new AtomicBoolean(false);
 
-   
-    public Connection conectar() {
-        Connection conexion = null;
+    static {
         try {
             Class.forName(CONDUCTOR);
-            conexion = DriverManager.getConnection(DIR, USUARIO, CONTRA);
         } catch (ClassNotFoundException e) {
-            System.out.println("Error: no se encontró el controlador JDBC.");
-            e.printStackTrace();
-        } catch (SQLException e) {
-            System.out.println("Error: no se pudo conectar a la base de datos.");
-            e.printStackTrace();
+            throw new RuntimeException("No se encontró el driver JDBC.", e);
         }
-        return conexion;
+        poolLocal = crearPool("PoolLocal", DIR, USUARIO, CONTRA, SLICE_MS);      // rebanadas de 3s
+        poolNube  = crearPool("PoolNube", DIR2, USUARIO2, CONTRA2, TIMEOUT_CONEXION_MS); // nube normal, 15s
+        seleccionarPoolInicial();
     }
+
+    private static HikariDataSource crearPool(String nombre, String dir, String usuario, String contra, int timeoutConexionMs) {
+        HikariConfig config = new HikariConfig();
+        config.setJdbcUrl(dir);
+        config.setUsername(usuario);
+        config.setPassword(contra);
+        config.setPoolName(nombre);
+        config.setConnectionTimeout(timeoutConexionMs); // ahora parametrizable
+        config.setMaximumPoolSize(10);
+        config.setMinimumIdle(2);
+        config.setInitializationFailTimeout(-1);
+        return new HikariDataSource(config);
+    }
+
+    private static void seleccionarPoolInicial() {
+        if (forzarNube.get()) {
+            activarNube();
+            return;
+        }
+        if (probarPool(poolLocal)) {
+            poolActivo.set(poolLocal);
+            System.out.println("Conectado al servidor local (VPN).");
+        } else {
+            activarNube();
+        }
+    }
+
+    private static void activarNube() {
+        poolActivo.set(poolNube);
+        System.out.println("Usando servidor en la nube.");
+    }
+
+    private static boolean probarPool(HikariDataSource pool) {
+        try (Connection c = pool.getConnection()) {
+            return c.isValid(3);
+        } catch (SQLException e) {
+            System.out.println("No se pudo validar " + pool.getPoolName() + ": " + e.getMessage());
+            return false;
+        }
+    }
+
+    public static void forzarConexionNube() {
+        forzarNube.set(true);
+        activarNube();
+    }
+    
+    // CONEXION CENTRAL
+    public Connection conectar() {
+        HikariDataSource pool = poolActivo.get();
+        try {
+            return pool.getConnection();
+        } catch (SQLException e) {
+            System.out.println("Error al obtener conexión de " + pool.getPoolName() + ": " + e.getMessage());
+            return null;
+        }
+    }
+    
+    
+    // LOGICA DE SISTEMA
+    
     
     public void registrarUsuario(Connection cn, String nombre, String usuario, String passHash) {
         PreparedStatement pstmCheck = null;

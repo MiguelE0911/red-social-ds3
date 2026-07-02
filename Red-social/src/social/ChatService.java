@@ -66,25 +66,23 @@ public class ChatService {
         return lista;
     }
 
-    // Envío de mensaje 
+ // Envío de mensaje 
     public static boolean enviarMensaje(int usuarioId, String contenido) {
         if (contenido == null || contenido.trim().isEmpty()) return false;
-
         Conexion bd = new Conexion();
         Connection cn = null;
         PreparedStatement pstm = null;
-
         try {
             cn = bd.conectar();
             if (cn == null) return false;
-
-            String sql = "INSERT INTO mensajes (usuario_id, contenido) VALUES (?, ?)";
+            String sql = "INSERT INTO mensajes (usuario_id, contenido, creado_en) VALUES (?, ?, ?)";
             pstm = cn.prepareStatement(sql);
             pstm.setInt(1, usuarioId);
             pstm.setString(2, contenido.trim());
+            pstm.setTimestamp(3, new java.sql.Timestamp(System.currentTimeMillis()));
+            
             pstm.executeUpdate();
             return true;
-
         } catch (SQLException e) {
             System.out.println("Error al enviar mensaje.");
             e.printStackTrace();

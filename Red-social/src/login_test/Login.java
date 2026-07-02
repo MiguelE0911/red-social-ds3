@@ -13,11 +13,15 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.awt.event.ActionEvent;
 
+import javax.swing.KeyStroke;
+import java.awt.event.KeyEvent;
+
 public class Login extends JDialog {
 
     private static final long serialVersionUID = 1L;
     public static JTextField campoUsuario;
     private final JPasswordField campoContrasena;
+    private final JButton botonAcceder = new JButton("ACCEDER");
     private int intentos = 2;
     private boolean loginExitoso = false;
     private String usuarioNombre;
@@ -114,7 +118,6 @@ public class Login extends JDialog {
         panelDeLogin.add(campoContrasena, gbcCampoContrasena);
 
         //  Botón Acceder 
-        JButton botonAcceder = new JButton("ACCEDER");
         botonAcceder.setFont(new Font("Arial Black", Font.BOLD, 14));
         botonAcceder.setBackground(PURPLE);
         botonAcceder.setForeground(Color.WHITE);
@@ -174,6 +177,8 @@ public class Login extends JDialog {
         gbcBotonSalir.fill = GridBagConstraints.HORIZONTAL;
         gbcBotonSalir.insets = new Insets(0, 0, 20, 0);
         panelDeLogin.add(botonSalir, gbcBotonSalir);
+        
+        configurarAtajoNube();
     }
 
     private void estilarCampo(JTextField field, String placeholder) {
@@ -234,64 +239,122 @@ public class Login extends JDialog {
                     "Campos vacíos", JOptionPane.WARNING_MESSAGE);
             return;
         }
-        Conexion bd = new Conexion();
-        Connection cn = bd.conectar();
-        ResultSet rs = null;
-        try {
-            rs = bd.buscarUsuario(cn, usuarioIngresado);
-            if (rs == null || !rs.next()) {
-                JOptionPane.showMessageDialog(this,
-                        "Usuario no encontrado.\nLe queda(n) " + intentos + " intento(s).",
-                        "Error", JOptionPane.ERROR_MESSAGE);
-                intentos--;
-                if (intentos < 0) {
-                    JOptionPane.showMessageDialog(this,
-                            "Ha superado el número de intentos permitidos.",
-                            "Bloqueado", JOptionPane.ERROR_MESSAGE);
-                    dispose();
+
+        // Deshabilitar el botón mientras se conecta, para evitar doble click
+        botonAcceder.setEnabled(false);
+        botonAcceder.setText("Conectando...");
+
+        new SwingWorker<Void, Void>() {
+            private boolean encontrado = false;
+            private boolean cuentaActiva = true;
+            private boolean claveCorrecta = false;
+            private String errorMensaje = null;
+
+            @Override
+            protected Void doInBackground() {
+                Conexion bd = new Conexion();
+                Connection cn = null;
+                ResultSet rs = null;
+                try {
+                    cn = bd.conectar();
+                    rs = bd.buscarUsuario(cn, usuarioIngresado);
+
+                    if (rs == null || !rs.next()) {
+                        encontrado = false;
+                        return null;
+                    }
+                    encontrado = true;
+
+                    String hashBD = rs.getString("contrasena_hash");
+                    cuentaActiva = rs.getBoolean("activo");
+
+                    if (cuentaActiva && BCrypt.checkpw(passwordIngresada, hashBD)) {
+                        claveCorrecta = true;
+                        usuarioId     = rs.getInt("id");
+                        usuarioNombre = rs.getString("nombre");
+                        usuarioRol    = rs.getString("rol");
+                    }
+                } catch (SQLException e) {
+                    errorMensaje = "Error al conectar con la base de datos.";
+                    e.printStackTrace();
+                } finally {
+                    bd.cerrar(rs, null, cn);
                 }
-                return;
+                return null;
             }
+            
+            @Override
+            protected void done() {
+                botonAcceder.setEnabled(true);
+                botonAcceder.setText("ACCEDER");
+                if (isCancelled()) {
+                    validarLogin();
+                    return;
+                }
 
-            String  hashBD = rs.getString("contrasena_hash");
-            boolean activo = rs.getBoolean("activo");
+                if (errorMensaje != null) {
+                    JOptionPane.showMessageDialog(Login.this, errorMensaje,
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
 
-            if (!activo) {
-                JOptionPane.showMessageDialog(this,
-                        "Esta cuenta ha sido suspendida.\nContacte al administrador.",
-                        "Cuenta suspendida", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
+                if (!encontrado) {
+                    JOptionPane.showMessageDialog(Login.this,
+                            "Usuario no encontrado.\nLe queda(n) " + intentos + " intento(s).",
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                    intentos--;
+                    if (intentos < 0) {
+                        JOptionPane.showMessageDialog(Login.this,
+                                "Ha superado el número de intentos permitidos.",
+                                "Bloqueado", JOptionPane.ERROR_MESSAGE);
+                        dispose();
+                    }
+                    return;
+                }
 
-            if (BCrypt.checkpw(passwordIngresada, hashBD)) {
-                usuarioId     = rs.getInt("id");
-                usuarioNombre = rs.getString("nombre");
-                usuarioRol    = rs.getString("rol");
-                loginExitoso  = true;
-                JOptionPane.showMessageDialog(this,
-                        "Bienvenido, " + usuarioNombre + ".",
-                        "Acceso concedido", JOptionPane.INFORMATION_MESSAGE);
-                dispose();
-            } else {
-                JOptionPane.showMessageDialog(this,
-                        "Contraseña incorrecta.\nLe queda(n) " + intentos + " intento(s).",
-                        "Error", JOptionPane.ERROR_MESSAGE);
-                intentos--;
-                if (intentos < 0) {
-                    JOptionPane.showMessageDialog(this,
-                            "Ha superado el número de intentos permitidos.",
-                            "Bloqueado", JOptionPane.ERROR_MESSAGE);
+                if (!cuentaActiva) {
+                    JOptionPane.showMessageDialog(Login.this,
+                            "Esta cuenta ha sido suspendida.\nContacte al administrador.",
+                            "Cuenta suspendida", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                if (claveCorrecta) {
+                    loginExitoso = true;
+                    JOptionPane.showMessageDialog(Login.this,
+                            "Bienvenido, " + usuarioNombre + ".",
+                            "Acceso concedido", JOptionPane.INFORMATION_MESSAGE);
                     dispose();
+                } else {
+                    JOptionPane.showMessageDialog(Login.this,
+                            "Contraseña incorrecta.\nLe queda(n) " + intentos + " intento(s).",
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                    intentos--;
+                    if (intentos < 0) {
+                        JOptionPane.showMessageDialog(Login.this,
+                                "Ha superado el número de intentos permitidos.",
+                                "Bloqueado", JOptionPane.ERROR_MESSAGE);
+                        dispose();
+                    }
                 }
             }
+        }.execute();
+    }
+    
+    // FORZAR CONEXION CON LA NUBE
+    private void configurarAtajoNube() {
+        KeyStroke atajo = KeyStroke.getKeyStroke(KeyEvent.VK_N,
+                java.awt.event.InputEvent.CTRL_DOWN_MASK | java.awt.event.InputEvent.SHIFT_DOWN_MASK);
 
-        } catch (SQLException e) {
-            JOptionPane.showMessageDialog(this,
-                    "Error al conectar con la base de datos.",
-                    "Error", JOptionPane.ERROR_MESSAGE);
-            e.printStackTrace();
-        } finally {
-            bd.cerrar(rs, null, cn);
-        }
+        getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(atajo, "forzarNube");
+        getRootPane().getActionMap().put("forzarNube", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                Conexion.forzarConexionNube();
+                JOptionPane.showMessageDialog(Login.this,
+                        "Conexión forzada al servidor en la nube.",
+                        "Modo nube activado", JOptionPane.INFORMATION_MESSAGE);
+            }
+        });
     }
 }

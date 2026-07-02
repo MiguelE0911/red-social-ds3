@@ -69,36 +69,32 @@ public class PrivateChatService {
         return lista;
     }
 
-    // Enviar mensaje privado
+    // enviar mensaje privado
     public static int enviarMensajePrivado(int remitenteId, int destinatarioId, String contenido) {
         if (contenido == null || contenido.trim().isEmpty()) return -1;
+        String sql = "INSERT INTO mensajes_privados (remitente_id, destinatario_id, contenido, creado_en) VALUES (?, ?, ?, ?)";
 
-        try (Connection cn = new Conexion().conectar()) {
-
-            String sql = "INSERT INTO mensajes_privados (remitente_id, destinatario_id, contenido) VALUES (?, ?, ?)";
-
-            PreparedStatement pstm = cn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+        try (Connection cn = new Conexion().conectar();
+             PreparedStatement pstm = cn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             pstm.setInt(1, remitenteId);
             pstm.setInt(2, destinatarioId);
             pstm.setString(3, contenido.trim());
+            pstm.setTimestamp(4, new java.sql.Timestamp(System.currentTimeMillis()));
 
             pstm.executeUpdate();
-
-            ResultSet rs = pstm.getGeneratedKeys();
-
-            if (rs.next()) {
-                return rs.getInt(1); // 👈 ID REAL de BD
+            try (ResultSet rs = pstm.getGeneratedKeys()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
             }
-
         } catch (SQLException e) {
             e.printStackTrace();
         }
-
         return -1;
     }
-
-    //  // validar antes de subir a la bd
+    
+    // validar antes de subir a la bd
     public static String validarTexto(String texto) {
         if (texto == null || texto.trim().isEmpty())
             return "El mensaje no puede estar vacío.";
