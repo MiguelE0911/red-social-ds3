@@ -5,6 +5,7 @@ import javax.swing.*;
 import javax.swing.border.LineBorder;
 
 import org.mindrot.jbcrypt.BCrypt;
+
 import java.awt.event.ActionListener;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
@@ -258,13 +259,11 @@ public class Login extends JDialog {
                 try {
                     cn = bd.conectar();
                     rs = bd.buscarUsuario(cn, usuarioIngresado);
-
                     if (rs == null || !rs.next()) {
                         encontrado = false;
                         return null;
                     }
                     encontrado = true;
-
                     String hashBD = rs.getString("contrasena_hash");
                     cuentaActiva = rs.getBoolean("activo");
 
@@ -291,13 +290,10 @@ public class Login extends JDialog {
                     validarLogin();
                     return;
                 }
-
                 if (errorMensaje != null) {
                     JOptionPane.showMessageDialog(Login.this, errorMensaje,
                             "Error", JOptionPane.ERROR_MESSAGE);
-                    return;
-                }
-
+                    return;}
                 if (!encontrado) {
                     JOptionPane.showMessageDialog(Login.this,
                             "Usuario no encontrado.\nLe queda(n) " + intentos + " intento(s).",
@@ -311,14 +307,12 @@ public class Login extends JDialog {
                     }
                     return;
                 }
-
                 if (!cuentaActiva) {
                     JOptionPane.showMessageDialog(Login.this,
                             "Esta cuenta ha sido suspendida.\nContacte al administrador.",
                             "Cuenta suspendida", JOptionPane.ERROR_MESSAGE);
                     return;
                 }
-
                 if (claveCorrecta) {
                     loginExitoso = true;
                     JOptionPane.showMessageDialog(Login.this,
@@ -345,7 +339,6 @@ public class Login extends JDialog {
     private void configurarAtajoNube() {
         KeyStroke atajo = KeyStroke.getKeyStroke(KeyEvent.VK_N,
                 java.awt.event.InputEvent.CTRL_DOWN_MASK | java.awt.event.InputEvent.SHIFT_DOWN_MASK);
-
         getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(atajo, "forzarNube");
         getRootPane().getActionMap().put("forzarNube", new AbstractAction() {
             @Override

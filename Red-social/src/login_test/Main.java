@@ -9,18 +9,15 @@ public class Main {
     	do {
     	    Login login = new Login(null);
     	    login.setVisible(true);
-
     	    if (!login.isLoginExitoso()) {
     	        JOptionPane.showMessageDialog(null,
     	                "No se pudo iniciar sesión. El programa terminará.",
     	                "Acceso denegado", JOptionPane.ERROR_MESSAGE);
     	        break;
     	    }
-
     	    ChatPanel chat = new ChatPanel(null, login.getUsuarioId(), login.getUsuarioNombre(), login.getUsuarioRol());
     	    chat.setVisible(true);
     	    cerroSesion = chat.isCerroPorSesion();
-
     	} while (cerroSesion);
     }
 }

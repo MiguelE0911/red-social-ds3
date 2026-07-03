@@ -11,20 +11,34 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
 
+import java.io.InputStream;
+import java.util.Properties;
+
 
 public class Conexion {
+	private static final String CONDUCTOR = "com.mysql.cj.jdbc.Driver";
+    private static final Properties props = new Properties();
+    static {
+        try (InputStream input = Conexion.class.getClassLoader()
+                .getResourceAsStream("config.properties")) {
+            if (input == null) {
+                throw new RuntimeException("No se encontró config.properties en el classpath");
+            }
+            props.load(input);
+        } catch (Exception e) {
+            throw new RuntimeException("Error cargando configuración", e);
+        }
+    }
 	
-	// SERVIDOR VPN
-	private static final String CONDUCTOR = "com.mysql.jdbc.Driver"; 
-	private static final String DIR = System.getenv("ADDRESS");
-	private static final String USUARIO = System.getenv("USER");
-    private static final String CONTRA = System.getenv("PASSWORD");
+    // SERVIDOR VPN
+    private static final String DIR = props.getProperty("db1.address");
+    private static final String USUARIO = props.getProperty("db1.user");
+    private static final String CONTRA = props.getProperty("db1.password");
 
     // SERVIDOR EN LA NUBE
-    private static final String DIR2 = System.getenv("ADDRESS2");
-    private static final String USUARIO2 = System.getenv("USER2");
-    private static final String CONTRA2 = System.getenv("PASSWORD2");
-    
+    private static final String DIR2 = props.getProperty("db2.address");
+    private static final String USUARIO2 = props.getProperty("db2.user");
+    private static final String CONTRA2 = props.getProperty("db2.password");
     
     private static final int TIMEOUT_CONEXION_MS = 15_000; // 15s para intentar conectar
     private static final int SLICE_MS = 3000; // cada intento individual
@@ -39,7 +53,7 @@ public class Conexion {
         } catch (ClassNotFoundException e) {
             throw new RuntimeException("No se encontró el driver JDBC.", e);
         }
-        poolLocal = crearPool("PoolLocal", DIR, USUARIO, CONTRA, SLICE_MS);      // rebanadas de 3s
+        poolLocal = crearPool("PoolLocal", DIR, USUARIO, CONTRA, SLICE_MS); // rebanadas de 3s
         poolNube  = crearPool("PoolNube", DIR2, USUARIO2, CONTRA2, TIMEOUT_CONEXION_MS); // nube normal, 15s
         seleccionarPoolInicial();
     }
@@ -50,7 +64,7 @@ public class Conexion {
         config.setUsername(usuario);
         config.setPassword(contra);
         config.setPoolName(nombre);
-        config.setConnectionTimeout(timeoutConexionMs); // ahora parametrizable
+        config.setConnectionTimeout(timeoutConexionMs);
         config.setMaximumPoolSize(10);
         config.setMinimumIdle(2);
         config.setInitializationFailTimeout(-1);
@@ -65,9 +79,7 @@ public class Conexion {
         if (probarPool(poolLocal)) {
             poolActivo.set(poolLocal);
             System.out.println("Conectado al servidor local (VPN).");
-        } else {
-            activarNube();
-        }
+        } else activarNube(); 
     }
 
     private static void activarNube() {
@@ -102,8 +114,6 @@ public class Conexion {
     
     
     // LOGICA DE SISTEMA
-    
-    
     public void registrarUsuario(Connection cn, String nombre, String usuario, String passHash) {
         PreparedStatement pstmCheck = null;
         PreparedStatement pstmInsert = null;

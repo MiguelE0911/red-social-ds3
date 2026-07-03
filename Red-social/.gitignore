@@ -1,3 +1,6 @@
 /bin/
 /target/
 .env
+config.properties
+target/
+dependency-reduced-pom.xml
