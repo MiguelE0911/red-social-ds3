@@ -117,6 +117,14 @@ public class AdminPanel extends JDialog {
         styleBoton(btnReporte, PURPLE);
         btnReporte.setPreferredSize(new Dimension(200, 36));
         btnReporte.addActionListener(e -> onGenerarReporte());
+        
+        JLabel lblInforme = new JLabel("Informe De Usuarios");
+        lblInforme.setForeground(new Color(240, 240, 240));
+        lblInforme.setFont(new Font("Arial Black", Font.BOLD, 14));
+        panelFooter.add(lblInforme);
+        
+        Component horizontalStrut = Box.createHorizontalStrut(220);
+        panelFooter.add(horizontalStrut);
         panelFooter.add(btnReporte);
 
         getContentPane().add(panelFooter, BorderLayout.SOUTH);
